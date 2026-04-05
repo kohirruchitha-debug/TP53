@@ -1,0 +1,83 @@
+#install tools
+sudo apt-get install bwa
+sudo apt-get install fastqc
+sudo apt-get install fastp
+sudo apt-get install samtools
+
+#download fastqc files
+wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR374/090/SRR37451590/SRR37451590_1.fastq.gz
+
+wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR374/090/SRR37451590/SRR37451590_2.fastq.gz
+
+#unzip folders
+gunzip *.gz
+
+#Quality check
+fastqc *.fastq
+
+#Trimming
+fastp -i SRR37451590_1.fastq -o Trim_SRR37451590_1.fastq -I SRR37451590_2.fastq -O Trim_SRR37451590_2.fastq --detect_adapter_for_pe --thread 2 --html fastp_report.html -q 30 -l 50
+
+#Recheck adaptor list
+fastqc Trim_SRR37451590_1.fastq Trim_SRR37451590_2.fastq
+
+#Download reference file
+wget -c https://hgdownload.gi.ucsc.edu/goldenPath/hg38/chromosomes/chr17.fa.gz 
+
+#uncompress the file
+gunzip chr17.fa.gz
+
+#indexing
+bwa index -a bwtsw chr17.fa
+
+#alignment
+bwa mem -t 2 chr17.fa Trim_SRR37451590_1.fastq Trim_SRR37451590_2.fastq > bwa_SRR37451590.bam
+
+#sorting
+samtools sort bwa_SRR37451590.bam > sorted_SRR37451590.bam
+
+#Remove duplicates
+ samtools rmdup -sS sorted_SRR37451590.bam rmdup_SRR37451590.bam
+
+#variant calling
+#install tools
+sudo apt-get install picard-tools
+
+#variant calling
+ picard-tools AddOrReplaceReadGroups I=rmdup_SRR37451590.bam O=picard_output.bam RGLB=lib1 RGPL=illumnia RGPU=unit1 RGSM=SRR37451590 SORT_ORDER=coordinate CREATE_INDEX=true VALIDATION_STRINGENCY=LENIENT
+
+#GATK
+#path for the file
+/mnt/d/DNASEQANALYSIS/TP53/gatk-4.3.0.0/gatk-4.3.0.0/gatk-package-4.3.0.0-local.jar
+
+#Create .dict file
+java -jar /mnt/d/DNASEQANALYSIS/TP53/gatk-4.3.0.0/gatk-4.3.0.0/gatk-package-4.3.0.0-local.jar CreateSequenceDictionary -R chr17.fa -O chr17.dict
+
+#Index the reference genome
+faidx chr17.fa
+
+#GATK OUTPUT
+java -jar /mnt/d/DNASEQANALYSIS/TP53/gatk-4.3.0.0/gatk-4.3.0.0/gatk-package-4.3.0.0-local.jar HaplotypeCaller -R chr17.fa -I picard_output.bam -O GATK_output.vcf
+
+#SNPEFF
+#Path
+/mnt/d/DNASEQANALYSIS/TP53/snpEff
+
+#Variant Filteration:
+java -jar /mnt/d/DNASEQANALYSIS/TP53/snpEff/snpsift.jar filter "((QUAL >= 30) & (DP >= 10) & (MQ >=30))" GATK_output.vcf > filtered_variants.vcf
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
